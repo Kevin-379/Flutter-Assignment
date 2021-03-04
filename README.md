@@ -1,8 +1,8 @@
 ## Flutter Assignment: Drawing Notes App
 
 ### Screenshots
-![Screenshot](screenshot1.jpg)
-![Screenshot](screenshot2.jpg)
+![Screenshot](Screenshot1.jpg)
+![Screenshot](Screenshot2.jpg)
 
 ### Build from source
 *Refer to https://flutter.dev/docs/deployment/android for more details*  
