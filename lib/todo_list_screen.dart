@@ -5,28 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'draw_screen.dart';
 
-class MyListItem {
-  String title = "";
-  String subTitle = "";
-  String id = "";
-
-  MyListItem(String title, String subTitle) {
-    this.title = title;
-    this.subTitle = subTitle;
-    this.id = UniqueKey().toString();
-  }
-
-  Map<String, String> toJson() => {
-        'title': title,
-        'subTitle': subTitle,
-        'id': id,
-      };
-  MyListItem.fromJson(Map<String, dynamic> json)
-      : title = json['title'],
-        subTitle = json['subTitle'],
-        id = json['id'];
-}
-
 class TodoListScreen extends StatefulWidget {
   @override
   _TodoListScreenState createState() => _TodoListScreenState();
@@ -34,34 +12,59 @@ class TodoListScreen extends StatefulWidget {
 
 class _TodoListScreenState extends State<TodoListScreen> {
   SharedPreferences prefs;
-  List<ListTile> getWidgetsList(List<MyListItem> listItems) {
-    List<ListTile> widgets = [];
-    for (int i = 0; i < listItems.length; i++) {
-      widgets.add(ListTile(
-        title: Text(listItems[i].title),
-        subtitle: Text(listItems[i].subTitle),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (context) => DrawScreen(fileName: listItems[i].id)),
-          );
-        },
-      ));
-    }
-    return widgets;
-  }
+  TextEditingController textController = TextEditingController();
 
+  // List of all drawings
   List<MyListItem> listItems = [
     MyListItem("Item 1", "Subtitle 1"),
     MyListItem("Item 2", "Subtitle 2")
   ];
+  // List of drawings filtered according to search
   List<MyListItem> showItems = [
     MyListItem("Item 1", "Subtitle 1"),
     MyListItem("Item 2", "Subtitle 2")
   ];
 
-  TextEditingController textController = TextEditingController();
+  List<Dismissible> getWidgetsList(List<MyListItem> items) {
+    List<Dismissible> widgets = [];
+    MyListItem item;
+    for (int i = 0; i < items.length; i++) {
+      item = items[i];
+      widgets.add(myListWidget(item, items, i));
+    }
+    return widgets;
+  }
+
+  Dismissible myListWidget(MyListItem item, List<MyListItem> items, int i) {
+    return Dismissible(
+      key: Key(item.id),
+      onDismissed: (direction) {
+        setState(() {
+          listItems.remove(item);
+          showItems = listItems
+              .where((element) => element.title.contains(textController.text))
+              .toList();
+        });
+        setData(listItems); // Save data locally
+      },
+      child: ListTile(
+        title: Text(item.title),
+        subtitle: Text(item.subTitle),
+        onTap: () {
+          // Go to drawing
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DrawScreen(
+                fileName: item.id,
+                prefs: prefs,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   void addNewItemToList(String title, String subtitle) {
     MyListItem item = MyListItem(title, subtitle);
@@ -71,7 +74,7 @@ class _TodoListScreenState extends State<TodoListScreen> {
         showItems.add(item);
       }
     });
-    setData();
+    setData(listItems);
   }
 
   showAlertDialog(BuildContext context) {
@@ -92,7 +95,11 @@ class _TodoListScreenState extends State<TodoListScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (context) => DrawScreen(fileName: listItems.last.id)),
+            builder: (context) => DrawScreen(
+              fileName: listItems.last.id,
+              prefs: prefs,
+            ),
+          ),
         );
       },
     );
@@ -116,8 +123,10 @@ class _TodoListScreenState extends State<TodoListScreen> {
 
   getData() async {
     prefs = await SharedPreferences.getInstance();
-    String encoded = (prefs.getString('files') ?? "[]");
-    List<dynamic> dyn = jsonDecode(encoded);
+    String encoded =
+        (prefs.getString('files') ?? "[]"); // Stores list of MyListItems
+    List<dynamic> dyn = jsonDecode(encoded); // Decode string to json
+    // Create list of MyListItem from json
     List<MyListItem> temp =
         dyn.map((el) => MyListItem.fromJson(el)).toList().cast<MyListItem>();
     setState(() {
@@ -128,19 +137,19 @@ class _TodoListScreenState extends State<TodoListScreen> {
     });
   }
 
-  setData() async {
-    await prefs.setString('files', jsonEncode(listItems));
+  setData(List<MyListItem> listItems) async {
+    await prefs.setString('files', jsonEncode(listItems)); // Write to disk
   }
 
   @override
   void initState() {
     super.initState();
-    getData();
+    getData(); // Load data from disk
   }
 
   @override
   void deactivate() {
-    setData();
+    setData(listItems); // Write to disk before exiting
     super.deactivate();
   }
 
@@ -165,7 +174,7 @@ class _TodoListScreenState extends State<TodoListScreen> {
                     showItems = listItems
                         .where((element) =>
                             element.title.contains(textController.text))
-                        .toList();
+                        .toList(); // Filter items to show
                   });
                 },
               )
@@ -181,4 +190,28 @@ class _TodoListScreenState extends State<TodoListScreen> {
       ),
     );
   }
+}
+
+class MyListItem {
+  String title = "";
+  String subTitle = "";
+  String id = ""; // Unique id to store data
+
+  MyListItem(String title, String subTitle) {
+    this.title = title;
+    this.subTitle = subTitle;
+    this.id = UniqueKey().toString();
+  }
+
+  // Convert data to json to store locally
+  Map<String, String> toJson() => {
+        'title': title,
+        'subTitle': subTitle,
+        'id': id,
+      };
+  // Create MyListItem from decoded json
+  MyListItem.fromJson(Map<String, dynamic> json)
+      : title = json['title'],
+        subTitle = json['subTitle'],
+        id = json['id'];
 }

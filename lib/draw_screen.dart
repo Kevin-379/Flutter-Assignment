@@ -6,35 +6,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class DrawScreen extends StatefulWidget {
   final String fileName;
+  final SharedPreferences prefs;
 
-  DrawScreen({this.fileName});
+  DrawScreen({this.fileName, this.prefs});
 
   @override
   _DrawScreenState createState() => _DrawScreenState();
 }
 
 class _DrawScreenState extends State<DrawScreen> {
-  SharedPreferences prefs;
-  List<List<Point>> points = [
-    [
-      Point(
-        coordinates: Offset(0, 0),
-        paint: Paint()
-          ..color = Colors.black
-          ..strokeWidth = 2,
-      ),
-      Point(
-        coordinates: Offset(100, 100),
-        paint: Paint()
-          ..color = Colors.black
-          ..strokeWidth = 2,
-      ),
-    ],
-  ];
+  List<List<Point>> points; // All drawn points
+  List<List<Point>> cache = []; // Cache to store undo data
 
   getData(String filename) async {
-    prefs = await SharedPreferences.getInstance();
-    String encodedPoints = (prefs.getString(filename) ?? "[]");
+    String encodedPoints = (widget.prefs.getString(filename) ?? "[]");
     List<dynamic> dyn = jsonDecode(encodedPoints);
     List<List<Point>> temp = dyn
         .map((li) {
@@ -48,7 +33,7 @@ class _DrawScreenState extends State<DrawScreen> {
   }
 
   setData(String filename) async {
-    await prefs.setString(filename, jsonEncode(points));
+    await widget.prefs.setString(filename, jsonEncode(points));
   }
 
   @override
@@ -86,9 +71,13 @@ class _DrawScreenState extends State<DrawScreen> {
               ..color = Colors.black
               ..strokeWidth = 2,
           );
-          setState(() => points[points.length - 1].add(point));
+          setState(() => points.last.add(point));
         },
-        onPanEnd: (details) {},
+        onPanEnd: (details) {
+          setState(() {
+            cache = [];
+          });
+        },
         child: Container(
           constraints: BoxConstraints.expand(),
           child: CustomPaint(
@@ -99,13 +88,40 @@ class _DrawScreenState extends State<DrawScreen> {
       bottomNavigationBar: ButtonBar(
         children: [
           FlatButton(
-            child: Icon(Icons.add),
-            onPressed: null,
+            child: Icon(Icons.save),
+            onPressed: () {
+              setData(widget.fileName);
+            },
+          ),
+          FlatButton(
+            child: Icon(Icons.undo),
+            onPressed: () {
+              if (points.length > 0) {
+                setState(() {
+                  List<Point> last = points.removeLast();
+                  cache.add(last);
+                });
+              }
+            },
+          ),
+          FlatButton(
+            child: Icon(Icons.redo),
+            onPressed: () {
+              if (cache.length > 0) {
+                setState(() {
+                  List<Point> last = cache.removeLast();
+                  points.add(last);
+                });
+              }
+            },
           ),
           FlatButton(
             child: Icon(Icons.close),
             onPressed: () {
-              setState(() => points = []);
+              setState(() {
+                points = [];
+                cache = [];
+              });
             },
           ),
         ],
